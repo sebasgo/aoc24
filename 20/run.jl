@@ -75,35 +75,38 @@ function collect_more_cheats(g, race)
     c = 0
     cs = Dict{Int, Int}()
     w = prepare_weights(g, race)
-    println(w)
-    for j=2:s[1]-1, i=2:s[2]-1
-        x = CartesianIndex(j, i)
+    candidates = Set{Tuple{CartesianIndex{2}, CartesianIndex{2}, Int}}()
+    for x in CartesianIndices(m)
         if !m[x]
             continue
         end
-        for l=0:min(s[1]-j,20)
-            for k=0:min(s[2]-i,20-l)
-                x2 = x + CartesianIndex(l, k)
-                if !m[x2] || k+l < 2
-                    continue
-                end
-                lx = lin_indcs[x]
-                lx2 = lin_indcs[x2]
-                add_edge!(g, lx, lx2)
-                @assert w[lx, lx2] == 0
-                w[lx, lx2] = w[lx2, lx] = k + l
-                # t = length(a_star(g, lin_indcs[race.start], lin_indcs[race.finish], w))
-                ds = dijkstra_shortest_paths(g, lin_indcs[race.start], w)
-                t = ds.dists[lin_indcs[race.finish]]
-                dt = t0 - t
-                cs[dt] = get(cs, dt, 0) + 1
-                if dt >= 100
-                    c += 1
-                end
-                # println("cheat ", x, " ", x2, " -> ", t)
-                rem_edge!(g, lx, lx2)
+        for x2 in CartesianIndices(m)
+            if !m[x2]
+                continue
+            end
+            d = sum(abs.(Tuple(x).-Tuple(x2)))
+            if d >= 2 && d <= 20
+                push!(candidates, x < x2 ? (x, x2, d) : (x2, x, d))
             end
         end
+    end
+    println(length(candidates))
+    for (x, x2, d) in candidates
+        lx = lin_indcs[x]
+        lx2 = lin_indcs[x2]
+        add_edge!(g, lx, lx2)
+        @assert w[lx, lx2] == 0 "$(w[lx, lx2])"
+        w[lx, lx2] = w[lx2, lx] = d
+        # t = length(a_star(g, lin_indcs[race.start], lin_indcs[race.finish], w))
+        ds = dijkstra_shortest_paths(g, lin_indcs[race.start], w)
+        t = ds.dists[lin_indcs[race.finish]]
+        dt = t0 - t
+        cs[dt] = get(cs, dt, 0) + 1
+        if dt >= 100
+            c += 1
+        end
+        # println("cheat ", x, " ", x2, " -> ", t)
+        rem_edge!(g, lx, lx2)
     end
     display(sort(cs))
     c
@@ -131,7 +134,7 @@ function main()
     # c = collect_cheats(g, r)
     # println("Task 1: $c")
     c = collect_more_cheats(g, r)
-    # println("Task 2: $c")
+    println("Task 2: $c")
 end
 
 @time main()

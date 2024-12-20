@@ -63,76 +63,47 @@ function collect_cheats(g, race)
             end
         end
     end
-    display(sort(cs))
     c
 end
 
 function collect_more_cheats(g, race)
     m = race.map
-    lin_indcs = LinearIndices(m)
+    l = LinearIndices(m)
+    cinds = CartesianIndices(m)
     s = size(race.map)
-    t0 = length(a_star(g, lin_indcs[race.start], lin_indcs[race.finish]))
+    t0 = length(a_star(g, l[race.start], l[race.finish]))
     c = 0
     cs = Dict{Int, Int}()
-    w = prepare_weights(g, race)
-    candidates = Set{Tuple{CartesianIndex{2}, CartesianIndex{2}, Int}}()
-    for x in CartesianIndices(m)
-        if !m[x]
-            continue
-        end
-        for x2 in CartesianIndices(m)
-            if !m[x2]
-                continue
-            end
-            d = sum(abs.(Tuple(x).-Tuple(x2)))
-            if d >= 2 && d <= 20
-                push!(candidates, x < x2 ? (x, x2, d) : (x2, x, d))
+    ds = dijkstra_shortest_paths(g, l[race.finish])
+    track = reverse(enumerate_paths(ds, l[race.start]))
+    for i=1:length(track)
+        for j=i+1:length(track)
+            lx = track[i]
+            lx2 = track[j]
+            x = cinds[lx]
+            x2 = cinds[lx2]
+            d_track = ds.dists[lx] - ds.dists[lx2]
+            d_cheat = sum(abs.(Tuple(x2 - x)))
+            savings = d_track - d_cheat
+            if 2 <= d_cheat <= 20 && savings > 0
+                cs[savings] = get(cs, savings, 0) + 1
+                if savings >= 100
+                    c += 1
+                end
             end
         end
     end
-    println(length(candidates))
-    for (x, x2, d) in candidates
-        lx = lin_indcs[x]
-        lx2 = lin_indcs[x2]
-        add_edge!(g, lx, lx2)
-        @assert w[lx, lx2] == 0 "$(w[lx, lx2])"
-        w[lx, lx2] = w[lx2, lx] = d
-        # t = length(a_star(g, lin_indcs[race.start], lin_indcs[race.finish], w))
-        ds = dijkstra_shortest_paths(g, lin_indcs[race.start], w)
-        t = ds.dists[lin_indcs[race.finish]]
-        dt = t0 - t
-        cs[dt] = get(cs, dt, 0) + 1
-        if dt >= 100
-            c += 1
-        end
-        # println("cheat ", x, " ", x2, " -> ", t)
-        rem_edge!(g, lx, lx2)
-    end
-    display(sort(cs))
     c
 end
 
-function prepare_weights(g, race)
-    n = prod(size(race.map))
-    is = Vector{Int}()
-    js = Vector{Int}()
-    for edge in edges(g)
-        l, r = Tuple(edge)
-        push!(is, l)
-        push!(js, r)
-        push!(is, r)
-        push!(js, l)
-    end
-    sparse(is, js, ones(Int, length(is)), n, n)
-end
 
 function main()
     r = read_race(ARGS[1])
     l = LinearIndices(r.map)
     g = SimpleGraph()
     build_track_graph(g, r)
-    # c = collect_cheats(g, r)
-    # println("Task 1: $c")
+    c = collect_cheats(g, r)
+    println("Task 1: $c")
     c = collect_more_cheats(g, r)
     println("Task 2: $c")
 end
